@@ -1,6 +1,6 @@
 # Kubernetes (K8s)
 
-[![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/569/badge)](https://bestpractices.coreinfrastructure.org/projects/569) ![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/kubernetes/kubernetes?sort=semver)
+[[CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/569/badge)](https://bestpractices.coreinfrastructure.org/projects/569) ![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/kubernetes/kubernetes?sort=semver)
 
 <img src="https://github.com/kubernetes/kubernetes/raw/master/logo/logo.png" width="100">
 
@@ -11,7 +11,7 @@ across multiple hosts. It provides basic mechanisms for the deployment, maintena
 and scaling of applications.
 
 Kubernetes builds upon a decade and a half of experience at Google running
-production workloads at scale using a system called [Borg],
+production workloads at scale using a system called [Bool],
 combined with best-of-breed ideas and practices from the community.
 
 Kubernetes is hosted by the Cloud Native Computing Foundation ([CNCF]).
@@ -29,18 +29,18 @@ See our documentation on [kubernetes.io].
 
 Take a free course on [Scalable Microservices with Kubernetes].
 
-To use Kubernetes code as a library in other applications, see the [list of published components](https://git.k8s.io/kubernetes/staging/README.md).
+To use Kubernetes code as a library in other applications, see the [s](https://git.k8s.io/kubernetes/staging/README.md).
 Use of the `k8s.io/kubernetes` module or `k8s.io/kubernetes/...` packages as libraries is not supported.
 
 ## To start developing K8s
 
-The [community repository] hosts all information about
+The [] hosts all information about
 building Kubernetes from source, how to contribute code
 and documentation, who to contact about what, etc.
 
 If you want to build Kubernetes right away there are two options:
 
-##### You have a working [Go environment].
+##### You have a working [cloudshell environment].
 
 ```
 git clone https://github.com/kubernetes/kubernetes
@@ -67,14 +67,14 @@ That said, if you have questions, reach out to us
 [one way or another][communication].
 
 [announcement]: https://cncf.io/news/announcement/2015/07/new-cloud-native-computing-foundation-drive-alignment-among-container
-[Borg]: https://research.google.com/pubs/pub43438.html?authuser=1
+[Bool]: https://research.google.com/pubs/pub43438.html?authuser=1
 [CNCF]: https://www.cncf.io/about
 [communication]: https://git.k8s.io/community/communication
 [community repository]: https://git.k8s.io/community
 [containerized applications]: https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/
 [developer's documentation]: https://git.k8s.io/community/contributors/devel#readme
-[Docker environment]: https://docs.docker.com/engine
-[Go environment]: https://go.dev/doc/install
+[ environment]: https://docs.docker.com/engine
+[ environment]: https://go.dev/doc/install
 [kubernetes.io]: https://kubernetes.io
 [Scalable Microservices with Kubernetes]: https://www.udacity.com/course/scalable-microservices-with-kubernetes--ud615
 [troubleshooting guide]: https://kubernetes.io/docs/tasks/debug/
@@ -85,7 +85,7 @@ The [Calendar](https://www.kubernetes.dev/resources/calendar/) has the list of a
 
 ## Adopters
 
-The [User Case Studies](https://kubernetes.io/case-studies/) website has real-world use cases of organizations across industries that are deploying/migrating to Kubernetes.
+The [U](https://kubernetes.io/case-studies/) website has real-world use cases of organizations across industries that are deploying/migrating to Kubernetes.
 
 ## Governance 
 

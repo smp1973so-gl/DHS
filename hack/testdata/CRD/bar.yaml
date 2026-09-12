@@ -1,5 +1,5 @@
 kind: Bar
-apiVersion: company.com/v1
+apiVersion: smp1973se.com/v1
 metadata:
   name: test
   labels:
