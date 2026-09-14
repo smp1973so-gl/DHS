@@ -557,12 +557,17 @@ func (p *PriorityQueue) isEntityWorthRequeuing(logger klog.Logger, entity framew
 	// For pod groups, if any pod is worth requeuing, the whole group is worth it.
 	// But we should prioritize higher strategies.
 	bestStrategy := queueSkip
+	hasPending := entity.HasPodsWithPendingPlugins()
 	for pInfo := range entity.ForEachPodInfo() {
 		strategy := p.isPodWorthRequeuing(logger, pInfo, event, oldObj, newObj, hintKeys)
 		if strategy > bestStrategy {
 			bestStrategy = strategy
 		}
 		if bestStrategy == queueImmediately {
+			return bestStrategy
+		}
+		// If no pods have pending plugins, the best strategy is queueAfterBackoff.
+		if !hasPending && bestStrategy == queueAfterBackoff {
 			return bestStrategy
 		}
 	}
@@ -1137,6 +1142,14 @@ func (p *PriorityQueue) AddUnschedulablePodIfNotPresent(logger klog.Logger, pInf
 
 	// We check whether this Pod may change its scheduling result by any of events that happened during scheduling.
 	schedulingHint := p.determineSchedulingHintForInFlightPod(logger, pInfo)
+
+	// Done has to be called before requeueing the pod. Otherwise, a race can happen
+	// when the pod is re-added to activeQ/backoffQ and a concurrent Pop picks it up
+	// before Done is called: Pop finds the UID still in inFlightPods and silently
+	// discards the pod, causing it to be permanently lost from the queue.
+	// The same reasoning applies to pod group members above.
+	p.Done(pInfo.Pod.UID)
+	calledDone = true
 
 	// In this case, we try to requeue this Pod to activeQ/backoffQ.
 	queue := p.requeueEntityWithQueueingStrategy(logger, pInfo, schedulingHint, framework.ScheduleAttemptFailure)

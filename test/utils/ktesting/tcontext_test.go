@@ -93,35 +93,39 @@ func TestCancelBeforeCleanup(t *testing.T) {
 	})
 }
 
-func TestSyncTestInit(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		// This must work inside a synctest bubble, despite Deadline panicking there.
-		// We then don't have a deadline.
-		tCtx := ktesting.Init(t)
-		deadline, ok := tCtx.Deadline()
-		if ok {
-			tCtx.Errorf("Expected no deadline, got %s", deadline)
-		}
-		if !tCtx.IsSyncTest() {
-			tCtx.Errorf("Expected to run as synctest")
-		}
+func TestRunCancelBeforeCleanup(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
+	tCtx.Run("sub", func(tCtx ktesting.TContext) {
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			// Blocks until the sub-test's context gets canceled automatically.
+			<-tCtx.Done()
+		}()
+
+		// See TestCancelBeforeCleanup: same reasoning applies to sub-tests.
+		tCtx.Cleanup(func() {
+			select {
+			case <-done:
+			case <-time.After(10 * time.Second):
+				t.Fatal("sub-test's TContext should already have been canceled by the time this Cleanup function runs")
+			}
+		})
 	})
 }
 
-func TestNormalInit(t *testing.T) {
-	// The outcome depends on how the unit test was started.
-	// See below for deterministic deadline/no deadline testing.
-	expectDeadline, expectOK := t.Deadline()
-	expectDeadline = expectDeadline.Add(-ktesting.DefaultCleanupGracePeriod)
+func TestSyncTestAutoCancel(t *testing.T) {
 	tCtx := ktesting.Init(t)
-	actualDeadline, actualOK := tCtx.Deadline()
-	tCtx.Expect(actualOK).To(gomega.Equal(expectOK), "have deadline")
-	if expectOK {
-		tCtx.Expect(actualDeadline).To(gomega.BeTemporally("~", expectDeadline, 2*time.Second), "deadline")
-	}
-	if tCtx.IsSyncTest() {
-		tCtx.Errorf("Expected to not run as synctest")
-	}
+
+	// Without synchronous cancellation before the callback returns, this
+	// goroutine would still be blocked and synctest would panic with
+	// "deadlock: main bubble goroutine has exited but blocked goroutines remain".
+	tCtx.SyncTest("sub", func(tCtx ktesting.TContext) {
+		go func() {
+			<-tCtx.Done()
+		}()
+	})
 }
 
 func TestNoDeadline(t *testing.T) {
