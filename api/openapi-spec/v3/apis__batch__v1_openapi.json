@@ -2755,7 +2755,7 @@
             "type": "string"
           },
           "keyType": {
-            "description": "The type of keypair Kubelet will generate for the pod.\n\nValid values are \"RSA3072\", \"RSA4096\", \"ECDSAP256\", \"ECDSAP384\", \"ECDSAP521\", and \"ED25519\".",
+            "description": "The type of keypair Kubelet will generate for the pod.\n\nValid values are \"RSA3072\", \"RSA4096\", \"ECDSAP256\", \"ECDSAP384\", \"ECDSAP521\", \"ED25519\", \"MLDSA44\", \"MLDSA65\", and \"MLDSA87\".\n\nMLDSA key types are only allowed when the PodCertificateMLDSA feature gate is enabled.",
             "type": "string"
           },
           "maxExpirationSeconds": {
@@ -3184,7 +3184,7 @@
             "x-kubernetes-list-type": "atomic"
           },
           "resourceClaims": {
-            "description": "ResourceClaims defines which ResourceClaims must be allocated and reserved before the Pod is allowed to start. The resources will be made available to those containers which consume them by name.\n\nThis is a stable field but requires that the DynamicResourceAllocation feature gate is enabled.\n\nThis field is immutable.",
+            "description": "ResourceClaims defines which ResourceClaims must be allocated and reserved before the Pod is allowed to start. The resources will be made available to those containers which consume them by name. This field is immutable.",
             "items": {
               "$ref": "#/components/schemas/io.k8s.api.core.v1.PodResourceClaim"
             },
@@ -3613,7 +3613,7 @@
         "description": "ResourceRequirements describes the compute resource requirements.",
         "properties": {
           "claims": {
-            "description": "Claims lists the names of resources, defined in spec.resourceClaims, that are used by this container.\n\nThis field depends on the DynamicResourceAllocation feature gate.\n\nThis field is immutable. It can only be set for containers.",
+            "description": "Claims lists the names of resources, defined in spec.resourceClaims, that are used by this container.\n\nThis field is immutable. It can only be set for containers.",
             "items": {
               "$ref": "#/components/schemas/io.k8s.api.core.v1.ResourceClaim"
             },
