@@ -17515,7 +17515,7 @@ func schema_k8sio_api_certificates_v1_CertificateSigningRequestSpec(ref common.R
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "usages specifies a set of key usages requested in the issued certificate.\n\nRequests for TLS client certificates typically request: \"digital signature\", \"key encipherment\", \"client auth\".\n\nRequests for TLS serving certificates typically request: \"key encipherment\", \"digital signature\", \"server auth\".\n\nValid values are:\n \"signing\", \"digital signature\", \"content commitment\",\n \"key encipherment\", \"key agreement\", \"data encipherment\",\n \"cert sign\", \"crl sign\", \"encipher only\", \"decipher only\", \"any\",\n \"server auth\", \"client auth\",\n \"code signing\", \"email protection\", \"s/mime\",\n \"ipsec end system\", \"ipsec tunnel\", \"ipsec user\",\n \"timestamping\", \"ocsp signing\", \"microsoft sgc\", \"netscape sgc\"",
+							Description: "usages specifies a set of key usages requested in the issued certificate.\n\nRequests for TLS client certificates typically request: \"digital signature\", \"client auth\".\n\nRequests for TLS serving certificates typically request: \"digital signature\", \"server auth\".\n\nValid values are:\n \"signing\", \"digital signature\", \"content commitment\",\n \"key encipherment\", \"key agreement\", \"data encipherment\",\n \"cert sign\", \"crl sign\", \"encipher only\", \"decipher only\", \"any\",\n \"server auth\", \"client auth\",\n \"code signing\", \"email protection\", \"s/mime\",\n \"ipsec end system\", \"ipsec tunnel\", \"ipsec user\",\n \"timestamping\", \"ocsp signing\", \"microsoft sgc\", \"netscape sgc\"\n\nWhen request contains a x509 certificate signing request signed with an ML-DSA key, usages must contain at least one of \"digital signature\", \"content commitment\", \"cert sign\", or \"crl sign\" and must not contain \"key encipherment\", \"key agreement\", \"data encipherment\", \"encipher only\", or \"decipher only\".",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -19599,7 +19599,7 @@ func schema_k8sio_api_core_v1_AttachedVolume(ref common.ReferenceCallback) commo
 					},
 					"devicePath": {
 						SchemaProps: spec.SchemaProps{
-							Description: "devicePath represents the device path where the volume should be available",
+							Description: "devicePath represents the path where the attached volume is available on the node. On Linux nodes, this is the host block-device node (e.g. /dev/xvdX) that the kubelet uses to mount and format the volume. On Windows nodes there is no /dev device tree, so this carries the CSI VolumeID (the attach identity reported by the CSI driver) instead of a device path.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -56391,7 +56391,7 @@ func schema_k8sio_api_scheduling_v1alpha3_CompositeGangSchedulingPolicy(ref comm
 				Properties: map[string]spec.Schema{
 					"minGroupCount": {
 						SchemaProps: spec.SchemaProps{
-							Description: "minGroupCount is the minimum number of child groups that must be schedulable or scheduled at the same time for the scheduler to admit the entire group. It must be a positive integer.",
+							Description: "minGroupCount is the minimum number of child groups that must be schedulable or scheduled at the same time for the scheduler to admit the entire group. It must be a positive integer. This field is mutable to support workload scaling.\n\nNote that the scheduler operates on an eventually consistent model. Updates to minGroupCount may not be immediately reflected in scheduling decisions due to propagation delays. If minGroupCount is updated while a scheduling cycle is in progress for that group, the new value may not take effect until the next cycle. Moreover, minGroupCount is only enforced during scheduling, meaning that modifications to this field do not affect already-scheduled pods, applying only to those evaluated in future cycles.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
@@ -56542,18 +56542,18 @@ func schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupSchedulingPolicy(ref 
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "CompositePodGroupSchedulingPolicy defines the scheduling configuration for a CompositePodGroup. Exactly one policy must be set.",
+				Description: "CompositePodGroupSchedulingPolicy defines the scheduling configuration for a CompositePodGroup. Exactly one policy must be set. The policy is chosen at creation time by setting either the Basic or Gang field. The CompositePodGroup may not change policy after creation. Fields within chosen policy may be updated after creation when their individual fields allow it.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"basic": {
 						SchemaProps: spec.SchemaProps{
-							Description: "basic specifies that the groups of this composite group should be scheduled independently. This field is immutable.",
+							Description: "basic specifies that the groups of this composite group should be scheduled independently. Setting this field at group creation time opts this group to basic scheduling; this field cannot be changed afterward.",
 							Ref:         ref(schedulingv1alpha3.CompositeBasicSchedulingPolicy{}.OpenAPIModelName()),
 						},
 					},
 					"gang": {
 						SchemaProps: spec.SchemaProps{
-							Description: "gang specifies that the groups of this composite group should be scheduled using all-or-nothing semantics.",
+							Description: "gang specifies that the groups of this composite group should be scheduled using all-or-nothing semantics. Setting this field at group creation time opts this group to gang scheduling; this field cannot be set or unset afterward. The minGroupCount field within Gang scheduling policy remains mutable after group creation.",
 							Ref:         ref(schedulingv1alpha3.CompositeGangSchedulingPolicy{}.OpenAPIModelName()),
 						},
 					},
@@ -56599,7 +56599,7 @@ func schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupSpec(ref common.Refer
 					},
 					"schedulingPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "schedulingPolicy defines the scheduling policy for this instance of the CompositePodGroup. Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate. This field is immutable.",
+							Description: "schedulingPolicy defines the scheduling policy for this instance of the CompositePodGroup. Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(schedulingv1alpha3.CompositePodGroupSchedulingPolicy{}.OpenAPIModelName()),
 						},
@@ -57948,7 +57948,7 @@ func schema_k8sio_api_scheduling_v1alpha3_WorkloadSpec(ref common.ReferenceCallb
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "compositePodGroupTemplates is the list of CompositePodGroup templates that make up the Workload. The maximum number of templates is 8. This field is immutable. Exactly one of CompositePodGroupTemplates and PodGroupTemplates must be set.\n\nThis field is used only when the CompositePodGroup feature gate is enabled.",
+							Description: "compositePodGroupTemplates is the list of CompositePodGroup templates that make up the Workload. The maximum number of templates is 8. Templates cannot be added or removed after the workload is created. Existing templates may still be updated where their individual fields allow it. Exactly one of CompositePodGroupTemplates and PodGroupTemplates must be set.\n\nThis field is used only when the CompositePodGroup feature gate is enabled.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -58059,7 +58059,7 @@ func schema_k8sio_api_scheduling_v1beta1_CompositeGangSchedulingPolicy(ref commo
 				Properties: map[string]spec.Schema{
 					"minGroupCount": {
 						SchemaProps: spec.SchemaProps{
-							Description: "minGroupCount is the minimum number of child groups that must be schedulable or scheduled at the same time for the scheduler to admit the entire group. It must be a positive integer.",
+							Description: "minGroupCount is the minimum number of child groups that must be schedulable or scheduled at the same time for the scheduler to admit the entire group. It must be a positive integer. This field is mutable to support workload scaling.\n\nNote that the scheduler operates on an eventually consistent model. Updates to minGroupCount may not be immediately reflected in scheduling decisions due to propagation delays. If minGroupCount is updated while a scheduling cycle is in progress for that group, the new value may not take effect until the next cycle. Moreover, minGroupCount is only enforced during scheduling, meaning that modifications to this field do not affect already-scheduled pods, applying only to those evaluated in future cycles.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
@@ -58109,18 +58109,18 @@ func schema_k8sio_api_scheduling_v1beta1_CompositePodGroupSchedulingPolicy(ref c
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "CompositePodGroupSchedulingPolicy defines the scheduling configuration for a CompositePodGroup. Exactly one policy must be set.",
+				Description: "CompositePodGroupSchedulingPolicy defines the scheduling configuration for a CompositePodGroup. Exactly one policy must be set. The policy is chosen at creation time by setting either the Basic or Gang field. The CompositePodGroup may not change policy after creation. Fields within chosen policy may be updated after creation when their individual fields allow it.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"basic": {
 						SchemaProps: spec.SchemaProps{
-							Description: "basic specifies that the groups of this composite group should be scheduled independently. This field is immutable.",
+							Description: "basic specifies that the groups of this composite group should be scheduled independently. Setting this field at group creation time opts this group to basic scheduling; this field cannot be changed afterward.",
 							Ref:         ref(schedulingv1beta1.CompositeBasicSchedulingPolicy{}.OpenAPIModelName()),
 						},
 					},
 					"gang": {
 						SchemaProps: spec.SchemaProps{
-							Description: "gang specifies that the groups of this composite group should be scheduled using all-or-nothing semantics.",
+							Description: "gang specifies that the groups of this composite group should be scheduled using all-or-nothing semantics. Setting this field at group creation time opts this group to gang scheduling; this field cannot be set or unset afterward. The minGroupCount field within Gang scheduling policy remains mutable after group creation.",
 							Ref:         ref(schedulingv1beta1.CompositeGangSchedulingPolicy{}.OpenAPIModelName()),
 						},
 					},
@@ -59158,7 +59158,7 @@ func schema_k8sio_api_scheduling_v1beta1_WorkloadSpec(ref common.ReferenceCallba
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "compositePodGroupTemplates is the list of CompositePodGroup templates that make up the Workload. The maximum number of templates is 8. This field is immutable. Exactly one of CompositePodGroupTemplates and PodGroupTemplates must be set.\n\nThis field is used only when the CompositePodGroup feature gate is enabled.",
+							Description: "compositePodGroupTemplates is the list of CompositePodGroup templates that make up the Workload. The maximum number of templates is 8. Templates cannot be added or removed after the workload is created. Existing templates may still be updated where their individual fields allow it. Exactly one of CompositePodGroupTemplates and PodGroupTemplates must be set.\n\nThis field is used only when the CompositePodGroup feature gate is enabled.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -62153,21 +62153,21 @@ func schema_k8sio_api_storagemigration_v1_StorageVersionMigration(ref common.Ref
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Description: "metadata is the standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 							Default:     map[string]interface{}{},
 							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Specification of the migration.",
+							Description: "spec is the specification of the migration.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(storagemigrationv1.StorageVersionMigrationSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Status of the migration.",
+							Description: "status is the status of the migration.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(storagemigrationv1.StorageVersionMigrationStatus{}.OpenAPIModelName()),
 						},
@@ -62240,7 +62240,7 @@ func schema_k8sio_api_storagemigration_v1_StorageVersionMigrationSpec(ref common
 				Properties: map[string]spec.Schema{
 					"resource": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The resource that is being migrated. The migrator sends requests to the endpoint serving the resource. Immutable.",
+							Description: "resource is the resource that is being migrated. The migrator sends requests to the endpoint serving the resource. Immutable.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(metav1.GroupResource{}.OpenAPIModelName()),
 						},
@@ -62273,7 +62273,7 @@ func schema_k8sio_api_storagemigration_v1_StorageVersionMigrationStatus(ref comm
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "The latest available observations of the migration's current state.",
+							Description: "conditions is the latest available observations of the migration's current state.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -62286,7 +62286,7 @@ func schema_k8sio_api_storagemigration_v1_StorageVersionMigrationStatus(ref comm
 					},
 					"resourceVersion": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ResourceVersion to compare with the GC cache for performing the migration. This is the current resource version of given group, version and resource when kube-controller-manager first observes this StorageVersionMigration resource.",
+							Description: "resourceVersion is the resource version to compare with the GC cache for performing the migration. This is the current resource version of given group, version and resource when kube-controller-manager first observes this StorageVersionMigration resource.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -62322,21 +62322,21 @@ func schema_k8sio_api_storagemigration_v1beta1_StorageVersionMigration(ref commo
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Description: "metadata is the standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 							Default:     map[string]interface{}{},
 							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Specification of the migration.",
+							Description: "spec is the specification of the migration.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(storagemigrationv1beta1.StorageVersionMigrationSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Status of the migration.",
+							Description: "status is the status of the migration.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(storagemigrationv1beta1.StorageVersionMigrationStatus{}.OpenAPIModelName()),
 						},
@@ -62409,7 +62409,7 @@ func schema_k8sio_api_storagemigration_v1beta1_StorageVersionMigrationSpec(ref c
 				Properties: map[string]spec.Schema{
 					"resource": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The resource that is being migrated. The migrator sends requests to the endpoint serving the resource. Immutable.",
+							Description: "resource is the resource that is being migrated. The migrator sends requests to the endpoint serving the resource. Immutable.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(metav1.GroupResource{}.OpenAPIModelName()),
 						},
@@ -62442,7 +62442,7 @@ func schema_k8sio_api_storagemigration_v1beta1_StorageVersionMigrationStatus(ref
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "The latest available observations of the migration's current state.",
+							Description: "conditions is the latest available observations of the migration's current state.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -62455,7 +62455,7 @@ func schema_k8sio_api_storagemigration_v1beta1_StorageVersionMigrationStatus(ref
 					},
 					"resourceVersion": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ResourceVersion to compare with the GC cache for performing the migration. This is the current resource version of given group, version and resource when kube-controller-manager first observes this StorageVersionMigration resource.",
+							Description: "resourceVersion is the resource version to compare with the GC cache for performing the migration. This is the current resource version of given group, version and resource when kube-controller-manager first observes this StorageVersionMigration resource.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -76095,6 +76095,20 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 						SchemaProps: spec.SchemaProps{
 							Description: "serverTLSBootstrap enables server certificate bootstrap. Instead of self signing a serving certificate, the Kubelet will request a certificate from the 'certificates.k8s.io' API. This requires an approver to approve the certificate signing requests (CSR). The RotateKubeletServerCertificate feature must be enabled when setting this field. Default: false",
 							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"clientCertificateKeyAlgorithm": {
+						SchemaProps: spec.SchemaProps{
+							Description: "clientCertificateKeyAlgorithm specifies the key algorithm to use when generating client certificate signing requests during certificate rotation. This field only takes effect when rotateCertificates is true. It controls keys generated for initial and renewal CSRs; it does not alter supplied static credentials. Note: ML-DSA algorithms require TLS 1.3 and peers that support the selected signature algorithm. Go rejects ML-DSA certificates under TLS 1.2. Valid values are: \"ECDSA-P256\", \"ECDSA-P384\", \"RSA-2048\", \"RSA-3072\", \"RSA-4096\", \"ML-DSA-44\", \"ML-DSA-65\", \"ML-DSA-87\". When omitted, defaults to \"ECDSA-P256\".",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"serverCertificateKeyAlgorithm": {
+						SchemaProps: spec.SchemaProps{
+							Description: "serverCertificateKeyAlgorithm specifies the key algorithm to use when generating server certificate signing requests during certificate rotation. This field only takes effect when serverTLSBootstrap is true. It is not used for self-signed serving certificates. Changing this value does not immediately replace an existing certificate; the new algorithm takes effect at the next certificate renewal. Note: ML-DSA algorithms require TLS 1.3 and peers that support the selected signature algorithm. Go rejects ML-DSA certificates under TLS 1.2. Valid values are: \"ECDSA-P256\", \"ECDSA-P384\", \"RSA-2048\", \"RSA-3072\", \"RSA-4096\", \"ML-DSA-44\", \"ML-DSA-65\", \"ML-DSA-87\". When omitted, defaults to \"ECDSA-P256\".",
+							Type:        []string{"string"},
 							Format:      "",
 						},
 					},

@@ -62,8 +62,10 @@ import (
 	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
+	plfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
+	"k8s.io/kubernetes/pkg/scheduler/framework/preemption"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
@@ -359,7 +361,7 @@ func TestFailureHandler(t *testing.T) {
 
 				var got *v1.Pod
 				if tt.podUpdatedDuringScheduling {
-					pInfo, ok := queue.GetPod(testPod.Name, testPod.Namespace, testPod.Spec.SchedulingGroup)
+					pInfo, ok := queue.GetPod(ctx, testPod.Name, testPod.Namespace, testPod.Spec.SchedulingGroup)
 					if !ok {
 						t.Fatalf("Failed to get pod %s/%s from queue", testPod.Namespace, testPod.Name)
 					}
@@ -521,15 +523,18 @@ func initScheduler(ctx context.Context, cache internalcache.Cache, queue interna
 	}
 
 	s := &Scheduler{
-		Cache:           cache,
-		client:          client,
-		StopEverything:  ctx.Done(),
-		SchedulingQueue: queue,
-		APIDispatcher:   apiDispatcher,
-		Profiles:        profile.Map{testSchedulerName: fwk},
-		logger:          logger,
+		Cache:            cache,
+		nodeInfoSnapshot: internalcache.NewEmptySnapshot(),
+		client:           client,
+		StopEverything:   ctx.Done(),
+		SchedulingQueue:  queue,
+		APIDispatcher:    apiDispatcher,
+		Profiles:         profile.Map{testSchedulerName: fwk},
+		logger:           logger,
 	}
-	s.initAlgorithm()
+	if err := s.initAlgorithm(); err != nil {
+		return nil, nil, err
+	}
 	s.applyDefaultHandlers()
 
 	return s, fwk, nil
@@ -1128,6 +1133,9 @@ func newFramework(ctx context.Context, r frameworkruntime.Registry, profile sche
 		frameworkruntime.WithMutableSnapshotLister(snapshot),
 		frameworkruntime.WithInformerFactory(informers.NewSharedInformerFactory(fake.NewClientset(), 0)),
 		frameworkruntime.WithPodGroupManager(internalcache.New(ctx, nil, false, false /* CompositePodGroup */)),
+		frameworkruntime.WithPreemptionManager(func(fh fwk.Handle) fwk.PreemptionManager {
+			return preemption.NewPreemptionManager(fh, plfeature.Features{})
+		}),
 	)
 }
 

@@ -107,6 +107,17 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.32"
+- name: CertificateSigningRequestMLDSA
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.38"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.38"
+    minCompatibilityVersion: "1.38"
 - name: ChangeContainerStatusOnKubeletRestart
   versionedSpecs:
   - default: true
@@ -489,6 +500,10 @@
     lockToDefault: false
     preRelease: GA
     version: "1.37"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.38"
 - name: DRADeviceTaints
   versionedSpecs:
   - default: false
@@ -503,6 +518,10 @@
     lockToDefault: false
     preRelease: GA
     version: "1.37"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.38"
 - name: DRAExtendedResource
   versionedSpecs:
   - default: false
@@ -1118,6 +1137,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.24"
+- name: ManagedFieldsOptOut
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.38"
 - name: ManifestBasedAdmissionControlConfig
   versionedSpecs:
   - default: false
@@ -1759,16 +1784,6 @@
     lockToDefault: true
     preRelease: Deprecated
     version: "1.36"
-- name: SeparateTaintEvictionController
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.29"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.34"
 - name: ServiceAccountNodeAudienceRestriction
   versionedSpecs:
   - default: false
@@ -2181,16 +2196,6 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.34"
-- name: WindowsHostNetwork
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.26"
-  - default: false
-    lockToDefault: false
-    preRelease: Deprecated
-    version: "1.33"
 - name: WinDSR
   versionedSpecs:
   - default: false

@@ -1618,6 +1618,15 @@ func (wrapper *PodGroupWrapper) UID(uid types.UID) *PodGroupWrapper {
 	return wrapper
 }
 
+// Label sets a {k,v} pair to the inner PodGroup label.
+func (wrapper *PodGroupWrapper) Label(k, v string) *PodGroupWrapper {
+	if wrapper.PodGroup.Labels == nil {
+		wrapper.PodGroup.Labels = make(map[string]string)
+	}
+	wrapper.PodGroup.Labels[k] = v
+	return wrapper
+}
+
 // Obj returns the inner PodGroup.
 func (wrapper *PodGroupWrapper) Obj() *schedulingv1beta1.PodGroup {
 	return &wrapper.PodGroup
@@ -1639,10 +1648,10 @@ func (wrapper *PodGroupWrapper) BasicPolicy() *PodGroupWrapper {
 }
 
 // WorkloadRef sets appropriate WorkloadRef field of the inner PodGroup.
-func (wrapper *PodGroupWrapper) WorkloadRef(templateName, workloadName string) *PodGroupWrapper {
+func (wrapper *PodGroupWrapper) WorkloadRef(workloadName, templateName string) *PodGroupWrapper {
 	wrapper.PodGroup.Spec.WorkloadRef = &schedulingv1beta1.WorkloadReference{
-		TemplateName: templateName,
 		WorkloadName: workloadName,
+		TemplateName: templateName,
 	}
 	return wrapper
 }
@@ -1905,6 +1914,15 @@ func (wrapper *CompositePodGroupWrapper) Namespace(namespace string) *CompositeP
 // UID sets the UID of the inner CompositePodGroup.
 func (wrapper *CompositePodGroupWrapper) UID(uid string) *CompositePodGroupWrapper {
 	wrapper.CompositePodGroup.UID = types.UID(uid)
+	return wrapper
+}
+
+// Label sets a {k,v} pair to the inner CompositePodGroup label.
+func (wrapper *CompositePodGroupWrapper) Label(k, v string) *CompositePodGroupWrapper {
+	if wrapper.CompositePodGroup.Labels == nil {
+		wrapper.CompositePodGroup.Labels = make(map[string]string)
+	}
+	wrapper.CompositePodGroup.Labels[k] = v
 	return wrapper
 }
 

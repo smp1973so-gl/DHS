@@ -24,10 +24,16 @@ import (
 )
 
 func TestStoreListOrdered(t *testing.T) {
-	store := newThreadedBtreeStoreIndexer(nil, btreeDegree)
-	require.NoError(t, store.Add(testStorageElement("foo3", "bar3", 1)))
-	require.NoError(t, store.Add(testStorageElement("foo1", "bar2", 2)))
-	require.NoError(t, store.Add(testStorageElement("foo2", "bar1", 3)))
+	store := NewWatchCacheStorage(nil, nil)
+	prev, err := store.Add(testStorageElement("foo3", "bar3", 1))
+	require.NoError(t, err)
+	assert.Nil(t, prev)
+	prev, err = store.Add(testStorageElement("foo1", "bar2", 2))
+	require.NoError(t, err)
+	assert.Nil(t, prev)
+	prev, err = store.Add(testStorageElement("foo2", "bar1", 3))
+	require.NoError(t, err)
+	assert.Nil(t, prev)
 	assert.Equal(t, []interface{}{
 		testStorageElement("foo1", "bar2", 2),
 		testStorageElement("foo2", "bar1", 3),
@@ -36,11 +42,19 @@ func TestStoreListOrdered(t *testing.T) {
 }
 
 func TestStoreListPrefix(t *testing.T) {
-	store := newThreadedBtreeStoreIndexer(nil, btreeDegree)
-	require.NoError(t, store.Add(testStorageElement("foo3", "bar3", 1)))
-	require.NoError(t, store.Add(testStorageElement("foo1", "bar2", 2)))
-	require.NoError(t, store.Add(testStorageElement("foo2", "bar1", 3)))
-	require.NoError(t, store.Add(testStorageElement("bar", "baz", 4)))
+	store := NewWatchCacheStorage(nil, nil)
+	prev, err := store.Add(testStorageElement("foo3", "bar3", 1))
+	require.NoError(t, err)
+	assert.Nil(t, prev)
+	prev, err = store.Add(testStorageElement("foo1", "bar2", 2))
+	require.NoError(t, err)
+	assert.Nil(t, prev)
+	prev, err = store.Add(testStorageElement("foo2", "bar1", 3))
+	require.NoError(t, err)
+	assert.Nil(t, prev)
+	prev, err = store.Add(testStorageElement("bar", "baz", 4))
+	require.NoError(t, err)
+	assert.Nil(t, prev)
 
 	items, err := store.OrderedListPrefix("foo", "")
 	require.NoError(t, err)
@@ -77,11 +91,11 @@ func TestStoreListPrefix(t *testing.T) {
 }
 
 func TestStoreSnapshotter(t *testing.T) {
-	cache := NewSnapshotter()
-	cache.Add(10, fakeIndexer{rv: 10})
-	cache.Add(20, fakeIndexer{rv: 20})
-	cache.Add(30, fakeIndexer{rv: 30})
-	cache.Add(40, fakeIndexer{rv: 40})
+	cache := newSnapshotter()
+	cache.Add(10, fakeSnapshot{rv: 10})
+	cache.Add(20, fakeSnapshot{rv: 20})
+	cache.Add(30, fakeSnapshot{rv: 30})
+	cache.Add(40, fakeSnapshot{rv: 40})
 	assert.Equal(t, 4, cache.Len())
 
 	t.Log("No snapshot from before first RV")
@@ -91,22 +105,22 @@ func TestStoreSnapshotter(t *testing.T) {
 	t.Log("Get snapshot from first RV")
 	snapshot, found := cache.GetLessOrEqual(10)
 	assert.True(t, found)
-	assert.Equal(t, 10, snapshot.(fakeIndexer).rv)
+	assert.Equal(t, 10, snapshot.(fakeSnapshot).rv)
 
 	t.Log("Get first snapshot by larger RV")
 	snapshot, found = cache.GetLessOrEqual(11)
 	assert.True(t, found)
-	assert.Equal(t, 10, snapshot.(fakeIndexer).rv)
+	assert.Equal(t, 10, snapshot.(fakeSnapshot).rv)
 
 	t.Log("Get second snapshot by larger RV")
 	snapshot, found = cache.GetLessOrEqual(22)
 	assert.True(t, found)
-	assert.Equal(t, 20, snapshot.(fakeIndexer).rv)
+	assert.Equal(t, 20, snapshot.(fakeSnapshot).rv)
 
 	t.Log("Get third snapshot for future revision")
 	snapshot, found = cache.GetLessOrEqual(100)
 	assert.True(t, found)
-	assert.Equal(t, 40, snapshot.(fakeIndexer).rv)
+	assert.Equal(t, 40, snapshot.(fakeSnapshot).rv)
 
 	t.Log("Remove snapshot less than 30")
 	cache.RemoveLess(30)
@@ -120,7 +134,7 @@ func TestStoreSnapshotter(t *testing.T) {
 
 	snapshot, found = cache.GetLessOrEqual(30)
 	assert.True(t, found)
-	assert.Equal(t, 30, snapshot.(fakeIndexer).rv)
+	assert.Equal(t, 30, snapshot.(fakeSnapshot).rv)
 
 	t.Log("Remove removing all RVs")
 	cache.Reset()
@@ -131,60 +145,18 @@ func TestStoreSnapshotter(t *testing.T) {
 	assert.False(t, found)
 }
 
-type fakeIndexer struct {
+type fakeSnapshot struct {
 	rv int
 }
 
-func (f fakeIndexer) Add(obj interface{}) error    { return nil }
-func (f fakeIndexer) Update(obj interface{}) error { return nil }
-func (f fakeIndexer) Delete(obj interface{}) error { return nil }
-func (f fakeIndexer) Clone() Snapshot              { return f }
-func (f fakeIndexer) OrderedListPrefix(prefixKey, continueKey string) ([]interface{}, error) {
-	return nil, nil
-}
-func (f fakeIndexer) ByIndex(indexName string, indexedValue string) ([]interface{}, error) {
-	return nil, nil
-}
-
-func (f fakeIndexer) Get(obj interface{}) (item interface{}, exists bool, err error) {
+func (f fakeSnapshot) GetByKey(key string) (item interface{}, exists bool, err error) {
 	return nil, false, nil
 }
 
-func (f fakeIndexer) GetByKey(key string) (item interface{}, exists bool, err error) {
-	return nil, false, nil
+func (f fakeSnapshot) OrderedListPrefix(prefixKey, continueKey string) ([]interface{}, error) {
+	return nil, nil
 }
 
-func (f fakeIndexer) List() []interface{} {
+func (f fakeSnapshot) RangePrefix(prefixKey, continueKey string) Range {
 	return nil
-}
-
-func (f fakeIndexer) ListKeys() []string {
-	return nil
-}
-
-func (f fakeIndexer) Replace([]interface{}, string) error {
-	return nil
-}
-func (f fakeIndexer) RangePrefix(prefixKey, continueKey string) Range { return nil }
-
-type fakeSnapshotter struct {
-	getLessOrEqual func(rv uint64) (Snapshot, bool)
-}
-
-var _ Snapshotter = (*fakeSnapshotter)(nil)
-
-func (f *fakeSnapshotter) Reset() {}
-func (f *fakeSnapshotter) GetLessOrEqual(rv uint64) (Snapshot, bool) {
-	if f.getLessOrEqual == nil {
-		return nil, false
-	}
-	return f.getLessOrEqual(rv)
-}
-func (f *fakeSnapshotter) Latest() (Snapshot, bool) {
-	return nil, false
-}
-func (f *fakeSnapshotter) Add(rv uint64, indexer Indexer) {}
-func (f *fakeSnapshotter) RemoveLess(rv uint64)           {}
-func (f *fakeSnapshotter) Len() int {
-	return 0
 }

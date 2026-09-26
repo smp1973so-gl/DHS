@@ -20,106 +20,73 @@ import (
 	"fmt"
 	"iter"
 	"strings"
-	"sync"
 
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/utils/third_party/forked/golang/btree"
 )
 
-// newThreadedBtreeStoreIndexer returns a storage for cacher by adding locking over the two 2 data structures:
-// * btree based storage for efficient LIST operation on prefix
-// * map based indexer for retrieving values by index.
-// This separation is used to allow independent snapshotting those two storages in the future.
-// Intention is to utilize btree for its cheap snapshots that don't require locking if don't mutate data.
-func newThreadedBtreeStoreIndexer(indexers cache.Indexers, degree int) *threadedStoreIndexer {
-	return &threadedStoreIndexer{
-		store:   newBtreeStore(degree),
-		indexer: newIndexer(indexers),
-	}
+func (si *WatchCacheStorage) Add(elem *Element) (*Element, error) {
+	return si.addOrUpdate(elem)
 }
 
-type threadedStoreIndexer struct {
-	lock    sync.RWMutex
-	store   btreeStore
-	indexer indexer
+func (si *WatchCacheStorage) Update(elem *Element) (*Element, error) {
+	return si.addOrUpdate(elem)
 }
 
-func (si *threadedStoreIndexer) Clone() Snapshot {
-	// Clone should not be called concurrently.
-	si.lock.Lock()
-	defer si.lock.Unlock()
-	return si.store.Clone()
-}
-
-func (si *threadedStoreIndexer) Add(obj interface{}) error {
-	return si.addOrUpdate(obj)
-}
-
-func (si *threadedStoreIndexer) Update(obj interface{}) error {
-	return si.addOrUpdate(obj)
-}
-
-func (si *threadedStoreIndexer) addOrUpdate(obj interface{}) error {
-	if obj == nil {
-		return fmt.Errorf("obj cannot be nil")
-	}
-	newElem, ok := obj.(*Element)
-	if !ok {
-		return fmt.Errorf("obj not a storeElement: %#v", obj)
+func (si *WatchCacheStorage) addOrUpdate(newElem *Element) (*Element, error) {
+	if newElem == nil {
+		return nil, fmt.Errorf("elem cannot be nil")
 	}
 	si.lock.Lock()
 	defer si.lock.Unlock()
 	oldElem := si.store.addOrUpdateElem(newElem)
-	return si.indexer.updateElem(newElem.Key, oldElem, newElem)
+	return oldElem, si.indexer.updateElem(newElem.Key, oldElem, newElem)
 }
 
-func (si *threadedStoreIndexer) Delete(obj interface{}) error {
-	storeElem, ok := obj.(*Element)
-	if !ok {
-		return fmt.Errorf("obj not a storeElement: %#v", obj)
+func (si *WatchCacheStorage) Delete(elem *Element) (*Element, error) {
+	if elem == nil {
+		return nil, fmt.Errorf("elem cannot be nil")
 	}
 	si.lock.Lock()
 	defer si.lock.Unlock()
-	oldObj, existed := si.store.deleteElem(storeElem)
+	oldElem, existed := si.store.deleteElem(elem)
 	if !existed {
-		return nil
+		return nil, nil
 	}
-	return si.indexer.updateElem(storeElem.Key, oldObj, nil)
+	return oldElem, si.indexer.updateElem(elem.Key, oldElem, nil)
 }
 
-func (si *threadedStoreIndexer) List() []interface{} {
+func (si *WatchCacheStorage) List() []interface{} {
 	si.lock.RLock()
 	defer si.lock.RUnlock()
 	return si.store.List()
 }
 
-func (si *threadedStoreIndexer) OrderedListPrefix(prefix, continueKey string) ([]interface{}, error) {
+func (si *WatchCacheStorage) OrderedListPrefix(prefix, continueKey string) ([]interface{}, error) {
 	si.lock.RLock()
 	defer si.lock.RUnlock()
 	return si.store.OrderedListPrefix(prefix, continueKey)
 }
 
-func (si *threadedStoreIndexer) ListKeys() []string {
+func (si *WatchCacheStorage) ListKeys() []string {
 	si.lock.RLock()
 	defer si.lock.RUnlock()
 	return si.store.ListKeys()
 }
 
-func (si *threadedStoreIndexer) Get(obj interface{}) (item interface{}, exists bool, err error) {
+func (si *WatchCacheStorage) get(obj interface{}) (item interface{}, exists bool, err error) {
 	si.lock.RLock()
 	defer si.lock.RUnlock()
 	return si.store.Get(obj)
 }
 
-func (si *threadedStoreIndexer) GetByKey(key string) (item interface{}, exists bool, err error) {
+func (si *WatchCacheStorage) GetByKey(key string) (item interface{}, exists bool, err error) {
 	si.lock.RLock()
 	defer si.lock.RUnlock()
 	return si.store.GetByKey(key)
 }
 
-func (si *threadedStoreIndexer) Replace(objs []interface{}, resourceVersion string) error {
-	si.lock.Lock()
-	defer si.lock.Unlock()
+func (si *WatchCacheStorage) replaceLocked(objs []interface{}, resourceVersion string) error {
 	err := si.store.Replace(objs, resourceVersion)
 	if err != nil {
 		return err
@@ -127,7 +94,7 @@ func (si *threadedStoreIndexer) Replace(objs []interface{}, resourceVersion stri
 	return si.indexer.Replace(objs, resourceVersion)
 }
 
-func (si *threadedStoreIndexer) ByIndex(indexName, indexValue string) ([]interface{}, error) {
+func (si *WatchCacheStorage) ByIndex(indexName, indexValue string) ([]interface{}, error) {
 	si.lock.RLock()
 	defer si.lock.RUnlock()
 	return si.indexer.ByIndex(indexName, indexValue)
@@ -151,42 +118,6 @@ func (s *btreeStore) Clone() Snapshot {
 	return &btreeStore{
 		tree: s.tree.Clone(),
 	}
-}
-
-func (s *btreeStore) Add(obj interface{}) error {
-	if obj == nil {
-		return fmt.Errorf("obj cannot be nil")
-	}
-	storeElem, ok := obj.(*Element)
-	if !ok {
-		return fmt.Errorf("obj not a storeElement: %#v", obj)
-	}
-	s.addOrUpdateElem(storeElem)
-	return nil
-}
-
-func (s *btreeStore) Update(obj interface{}) error {
-	if obj == nil {
-		return fmt.Errorf("obj cannot be nil")
-	}
-	storeElem, ok := obj.(*Element)
-	if !ok {
-		return fmt.Errorf("obj not a storeElement: %#v", obj)
-	}
-	s.addOrUpdateElem(storeElem)
-	return nil
-}
-
-func (s *btreeStore) Delete(obj interface{}) error {
-	if obj == nil {
-		return fmt.Errorf("obj cannot be nil")
-	}
-	storeElem, ok := obj.(*Element)
-	if !ok {
-		return fmt.Errorf("obj not a storeElement: %#v", obj)
-	}
-	s.deleteElem(storeElem)
-	return nil
 }
 
 func (s *btreeStore) deleteElem(storeElem *Element) (*Element, bool) {
@@ -440,28 +371,15 @@ func (i *indexer) delete(key, value string, index map[string]map[string]*Element
 // However, this solution is more complex and is deferred for future implementation.
 //
 // TODO: Rewrite to use a cyclic buffer
-func NewSnapshotter() Snapshotter {
-	s := &storeSnapshotter{
+func newSnapshotter() snapshotter {
+	return snapshotter{
 		snapshots: btree.New(btreeDegree, func(a, b rvSnapshot) bool {
 			return a.resourceVersion < b.resourceVersion
 		}),
 	}
-	return s
 }
 
-var _ Snapshotter = (*storeSnapshotter)(nil)
-
-type Snapshotter interface {
-	Reset()
-	GetLessOrEqual(rv uint64) (Snapshot, bool)
-	Latest() (Snapshot, bool)
-	Add(rv uint64, indexer Indexer)
-	RemoveLess(rv uint64)
-	Len() int
-}
-
-type storeSnapshotter struct {
-	mux       sync.RWMutex
+type snapshotter struct {
 	snapshots *btree.BTree[rvSnapshot]
 }
 
@@ -470,16 +388,11 @@ type rvSnapshot struct {
 	snapshot        Snapshot
 }
 
-func (s *storeSnapshotter) Reset() {
-	s.mux.Lock()
-	defer s.mux.Unlock()
+func (s *snapshotter) Reset() {
 	s.snapshots.Clear(false)
 }
 
-func (s *storeSnapshotter) GetLessOrEqual(rv uint64) (Snapshot, bool) {
-	s.mux.RLock()
-	defer s.mux.RUnlock()
-
+func (s *snapshotter) GetLessOrEqual(rv uint64) (Snapshot, bool) {
 	var result *rvSnapshot
 	s.snapshots.DescendLessOrEqual(rvSnapshot{resourceVersion: rv}, func(rvs rvSnapshot) bool {
 		result = &rvs
@@ -491,10 +404,7 @@ func (s *storeSnapshotter) GetLessOrEqual(rv uint64) (Snapshot, bool) {
 	return result.snapshot, true
 }
 
-func (s *storeSnapshotter) Latest() (Snapshot, bool) {
-	s.mux.RLock()
-	defer s.mux.RUnlock()
-
+func (s *snapshotter) Latest() (Snapshot, bool) {
 	max, ok := s.snapshots.Max()
 	if !ok {
 		return nil, false
@@ -502,15 +412,11 @@ func (s *storeSnapshotter) Latest() (Snapshot, bool) {
 	return max.snapshot, true
 }
 
-func (s *storeSnapshotter) Add(rv uint64, indexer Indexer) {
-	s.mux.Lock()
-	defer s.mux.Unlock()
-	s.snapshots.ReplaceOrInsert(rvSnapshot{resourceVersion: rv, snapshot: indexer.Clone()})
+func (s *snapshotter) Add(rv uint64, snapshot Snapshot) {
+	s.snapshots.ReplaceOrInsert(rvSnapshot{resourceVersion: rv, snapshot: snapshot})
 }
 
-func (s *storeSnapshotter) RemoveLess(rv uint64) {
-	s.mux.Lock()
-	defer s.mux.Unlock()
+func (s *snapshotter) RemoveLess(rv uint64) {
 	for s.snapshots.Len() > 0 {
 		oldest, ok := s.snapshots.Min()
 		if !ok {
@@ -523,9 +429,6 @@ func (s *storeSnapshotter) RemoveLess(rv uint64) {
 	}
 }
 
-func (s *storeSnapshotter) Len() int {
-	s.mux.RLock()
-	defer s.mux.RUnlock()
-
+func (s *snapshotter) Len() int {
 	return s.snapshots.Len()
 }
