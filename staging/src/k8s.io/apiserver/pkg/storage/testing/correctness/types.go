@@ -42,6 +42,7 @@ type Request struct {
 	Key    string
 	Create CreateRequest
 	Get    GetRequest
+	List   ListRequest
 	Delete DeleteRequest
 	Update UpdateRequest
 }
@@ -54,6 +55,11 @@ type CreateRequest struct {
 // GetRequest contains parameters specific to Get operations.
 type GetRequest struct {
 	Options storage.GetOptions
+}
+
+// ListRequest contains parameters specific to GetList operations.
+type ListRequest struct {
+	Options storage.ListOptions
 }
 
 // DeleteRequest contains parameters specific to Delete operations.
@@ -92,9 +98,21 @@ func (r Request) Describe(output Response) string {
 			return fmt.Sprintf("%s(%s) -> Invalid %s", r.Op, r.Key, errStr)
 		case storage.IsCorruptObject(output.Err):
 			return fmt.Sprintf("%s(%s) -> Corrupt", r.Op, r.Key)
+		case storage.IsTooLargeResourceVersion(output.Err):
+			return fmt.Sprintf("%s(%s) -> Too Large RV", r.Op, r.Key)
 		default:
 			return fmt.Sprintf("%s(%s) -> %v", r.Op, r.Key, output.Err)
 		}
+	}
+	if r.Op == OpList {
+		accessor, err := meta.ListAccessor(output.Object)
+		if err != nil {
+			panic(err)
+		}
+		if r.List.Options.ResourceVersion != "" {
+			return fmt.Sprintf("%s(%s, RV=%s, Match=%s) -> RV: %s, Items: %d", r.Op, r.Key, r.List.Options.ResourceVersion, r.List.Options.ResourceVersionMatch, accessor.GetResourceVersion(), meta.LenList(output.Object))
+		}
+		return fmt.Sprintf("%s(%s) -> RV: %s, Items: %d", r.Op, r.Key, accessor.GetResourceVersion(), meta.LenList(output.Object))
 	}
 	accessor, err := meta.Accessor(output.Object)
 	if err != nil {
@@ -129,6 +147,7 @@ const (
 	OpCreate OpType = "Create"
 	OpDelete OpType = "Delete"
 	OpGet    OpType = "Get"
+	OpList   OpType = "List"
 	OpUpdate OpType = "Update"
 )
 
@@ -138,13 +157,30 @@ type Response struct {
 	Err    error
 }
 
-// WatchRequest contains parameters for a watch stream.
+// Change is a write the model applied to a single key. PrevObject is nil for a
+// create and Object is nil for a delete. Like etcd3 and the cacher, deciding
+// what a watcher with a predicate receives requires both objects.
+type Change struct {
+	Key             string
+	ResourceVersion uint64
+	Object          runtime.Object
+	PrevObject      runtime.Object
+}
+
+// WatchRequest contains parameters for a watch stream, exactly as passed to storage.Interface.Watch.
 type WatchRequest struct {
-	ResourceVersion string
+	Key     string
+	Options storage.ListOptions
 }
 
 // WatchResponse contains the events and any terminal error received from a watch stream.
 type WatchResponse struct {
 	Events []watch.Event
 	Err    error
+}
+
+// WatchOperation captures a recorded watch operation with its request and response.
+type WatchOperation struct {
+	Request  WatchRequest
+	Response WatchResponse
 }

@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -43,30 +44,99 @@ var (
 		Weight: 10,
 	}, {
 		Choice: RequestTypeDeleteUIDPrecondition,
-		Weight: 10,
+		Weight: 5,
+	}, {
+		Choice: RequestTypeDeleteRVPrecondition,
+		Weight: 5,
 	}, {
 		Choice: RequestTypeGet,
-		Weight: 25,
+		Weight: 5,
+	}, {
+		Choice: RequestTypeGetIgnoreNotFound,
+		Weight: 5,
+	}, {
+		Choice: RequestTypeList,
+		Weight: 5,
+	}, {
+		Choice: RequestTypeListNamespace,
+		Weight: 5,
+	}, {
+		Choice: RequestTypeListNonRecursive,
+		Weight: 5,
+	}, {
+		Choice: RequestTypeListRVZero,
+		Weight: 5,
+	}, {
+		Choice: RequestTypeListRVNotOlderThan,
+		Weight: 5,
+	}, {
+		Choice: RequestTypeListRVExact,
+		Weight: 5,
 	}, {
 		Choice: RequestTypeUpdate,
-		Weight: 20,
+		Weight: 10,
 	}, {
 		Choice: RequestTypeUpdateUIDPrecondition,
-		Weight: 10,
+		Weight: 5,
+	}, {
+		Choice: RequestTypeUpdateRVPrecondition,
+		Weight: 5,
 	}, {
 		Choice: RequestTypeUpdateNoOp,
 		Weight: 5,
 	}, {
 		Choice: RequestTypeUpdateWithCachedObject,
 		Weight: 5,
+	}, {
+		Choice: RequestTypeUpdateIgnoreNotFound,
+		Weight: 5,
 	}}
 
-	cfg = TraffiConfig{
+	unaryCfg = UnaryConfig{
 		Concurrency:         8,
 		Namespaces:          2,
 		Objects:             4,
 		MaxOperations:       10000,
 		RequestDistribution: requestDistribution,
+	}
+
+	watchRequestDistribution = []ChoiceWeight[WatchRequestType]{{
+		Choice: RVEmpty,
+		Weight: 15,
+	}, {
+		Choice: RVZero,
+		Weight: 15,
+	}, {
+		Choice: RVOne,
+		Weight: 10,
+	}, {
+		Choice: RVCurrent,
+		Weight: 20,
+	}, {
+		Choice: RVPast,
+		Weight: 20,
+	}, {
+		Choice: RVFuture,
+		Weight: 20,
+	}, {
+		Choice: WatchListRVEmpty,
+		Weight: 10,
+	}, {
+		Choice: WatchListRVZero,
+		Weight: 10,
+	}, {
+		Choice: WatchListRVCurrent,
+		Weight: 10,
+	}, {
+		Choice: WatchListRVPast,
+		Weight: 10,
+	}}
+
+	watchCfg = WatchConfig{
+		Concurrency:         4,
+		Duration:            500 * time.Millisecond,
+		MaxEvents:           50,
+		RequestDistribution: watchRequestDistribution,
 	}
 )
 
@@ -84,37 +154,82 @@ func TestCorrectness(t *testing.T) {
 	}
 	for _, s := range storages {
 		t.Run(s.name, func(t *testing.T) {
-			ctx := t.Context()
 			store, storagePrefix := s.fn(t)
-
-			list := &api.PodList{}
-			err := store.GetList(ctx, "/pods", storage.ListOptions{Recursive: true, Predicate: storage.Everything}, list)
-			require.NoError(t, err)
-			initialState, err := correctness.NewModelFromStorage(storagePrefix, list, func() runtime.Object { return &api.Pod{} }, cacheKeyFunc)
-			require.NoError(t, err)
-
-			operations, err := RunTraffic(t.Context(), store, cfg)
-			require.NoError(t, err)
-			t.Logf("Collected %d operations across %d concurrent workers on %s",
-				len(operations), cfg.Concurrency, s.name)
-
-			model := ToPorcupineModel(initialState)
-			res, info := porcupine.CheckOperationsVerbose(model, toPorcupineOperations(operations), time.Minute)
-
-			if artifacts := os.Getenv("ARTIFACTS"); artifacts != "" {
-				testName := strings.ReplaceAll(t.Name(), "/", "_")
-				path := filepath.Join(artifacts, fmt.Sprintf("%s_linearization_visualization.html", testName))
-				if err := porcupine.VisualizePath(model, info, path); err != nil {
-					t.Logf("Failed to write linearization visualization: %v", err)
-				} else {
-					t.Logf("Linearization visualization written to: %s", path)
-				}
-			}
-
-			require.Equal(t, porcupine.Ok, res, "Linearizability check failed across %d operations", len(operations))
-			t.Logf("Linearizability check succeeded across %d operations", len(operations))
+			testCorrectness(t, store, storagePrefix)
 		})
 	}
+}
+
+func testCorrectness(t *testing.T, store storage.Interface, storagePrefix string) {
+	ctx := t.Context()
+	versioner := store.Versioner()
+
+	list := &api.PodList{}
+	err := store.GetList(ctx, "/pods", storage.ListOptions{Recursive: true, Predicate: storage.Everything}, list)
+	require.NoError(t, err)
+	initialState, err := correctness.NewModelFromStorage(storagePrefix, list, func() runtime.Object { return &api.Pod{} }, func() runtime.Object { return &api.PodList{} }, cacheKeyFunc, versioner)
+	require.NoError(t, err)
+
+	stopWatches := make(chan struct{})
+	var operations []correctness.Operation
+	var watches []correctness.WatchOperation
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		operations, err = RunUnaryTraffic(ctx, store, unaryCfg)
+		close(stopWatches)
+	})
+	wg.Go(func() {
+		watches = RunWatchTraffic(ctx, store, watchCfg, stopWatches)
+	})
+	wg.Wait()
+	require.NoError(t, err)
+	watchEvents := 0
+	for _, w := range watches {
+		watchEvents += len(w.Response.Events)
+	}
+	t.Logf("Collected %d unary operations and %d watches with %d events",
+		len(operations), len(watches), watchEvents)
+
+	model := ToPorcupineModel(initialState)
+	res, info := porcupine.CheckOperationsVerbose(model, toPorcupineOperations(operations), time.Minute)
+
+	if artifacts := os.Getenv("ARTIFACTS"); artifacts != "" {
+		testName := strings.ReplaceAll(t.Name(), "/", "_")
+		path := filepath.Join(artifacts, fmt.Sprintf("%s_linearization_visualization.html", testName))
+		if err := porcupine.VisualizePath(model, info, path); err != nil {
+			t.Logf("Failed to write linearization visualization: %v", err)
+		} else {
+			t.Logf("Linearization visualization written to: %s", path)
+		}
+	}
+
+	require.Equal(t, porcupine.Ok, res, "Linearizability check failed across %d operations", len(operations))
+	t.Logf("Linearizability check succeeded across %d operations", len(operations))
+
+	// The model defines no Partition, so an Ok result carries a single
+	// complete linearization.
+	linearizations := info.PartialLinearizations()
+	require.Len(t, linearizations, 1, "expected one partition")
+	require.Len(t, linearizations[0], 1, "expected one linearization")
+	linearizedOps := orderByLinearization(operations, linearizations[0][0])
+	replay, err := correctness.NewReplay(initialState, linearizedOps)
+	require.NoError(t, err)
+	for _, op := range linearizedOps {
+		require.NoError(t, replay.Validate(op.Request, op.Response))
+	}
+	validator := correctness.NewWatchValidator(versioner, replay, cacheKeyFunc)
+	for _, w := range watches {
+		require.NoError(t, validator.ValidateWatch(w.Request, w.Response))
+	}
+	require.Positive(t, watchEvents, "expected at least one watch event across %d watches", len(watches))
+}
+
+func orderByLinearization(ops []correctness.Operation, linearization []int) []correctness.Operation {
+	ordered := make([]correctness.Operation, len(linearization))
+	for i, idx := range linearization {
+		ordered[i] = ops[idx]
+	}
+	return ordered
 }
 
 // ToPorcupineModel maps a correctness.Model to porcupine.Model with an initial state.

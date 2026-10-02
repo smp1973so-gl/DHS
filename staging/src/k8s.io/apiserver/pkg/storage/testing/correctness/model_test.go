@@ -23,13 +23,23 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
+	"k8s.io/apiserver/pkg/storage"
 )
 
 func TestCorrectness(t *testing.T) {
-	model := NewEmptyModel("", func() runtime.Object { return &example.Pod{} })
+	versioner := &storage.APIObjectVersioner{}
+	newPod := func() runtime.Object { return &example.Pod{} }
+	model := NewEmptyModel("", newPod, func() runtime.Object { return &example.PodList{} }, versioner)
+	steps := correctnessTestSteps()
+	history := make([]Operation, len(steps))
+	for i, step := range steps {
+		history[i] = Operation{Request: step.Request, Response: step.CorrectResponse}
+	}
+	replay, err := NewReplay(model, history)
+	require.NoError(t, err)
 
 	var expectEvents, gotEvents []watch.Event
-	for _, step := range correctnessTestSteps() {
+	for _, step := range steps {
 		t.Run(step.Name, func(t *testing.T) {
 			if step.ExpectedEvent != nil {
 				expectEvents = append(expectEvents, *step.ExpectedEvent)
@@ -37,16 +47,35 @@ func TestCorrectness(t *testing.T) {
 
 			for i, invalidResponse := range step.InvalidResponses {
 				ok, _, _ := model.Step(step.Request, invalidResponse)
-				require.False(t, ok, "alternative response #%d should return ok=false: req=%+v resp=%+v", i, step.Request, invalidResponse)
+				if ok {
+					err := replay.Validate(step.Request, invalidResponse)
+					require.Error(t, err, "alternative response #%d should fail validation: req=%+v resp=%+v", i, step.Request, invalidResponse)
+				}
 			}
 
-			ok, next, event := model.Step(step.Request, step.CorrectResponse)
+			ok, next, change := model.Step(step.Request, step.CorrectResponse)
 			require.True(t, ok, "valid response should return ok=true: req=%+v resp=%+v", step.Request, step.CorrectResponse)
+			require.NoError(t, replay.Validate(step.Request, step.CorrectResponse))
 			model = next
-			if event != nil {
+			if change != nil {
+				event, err := change.toWatchEvent(storage.APIObjectVersioner{}, storage.Everything)
+				require.NoError(t, err)
 				gotEvents = append(gotEvents, *event)
 			}
 		})
 	}
 	require.Equal(t, expectEvents, gotEvents)
+
+	validator := NewWatchValidator(versioner, replay, getKey)
+	for _, tc := range watchTestCases() {
+		t.Run(tc.Name, func(t *testing.T) {
+			if tc.ExpectError != nil {
+				require.NoError(t, validator.ValidateWatch(tc.Request, WatchResponse{Err: tc.ExpectError}))
+				return
+			}
+			events, err := replay.Watch(tc.Request)
+			require.NoError(t, err)
+			require.NoError(t, validator.ValidateWatch(tc.Request, WatchResponse{Events: events}))
+		})
+	}
 }

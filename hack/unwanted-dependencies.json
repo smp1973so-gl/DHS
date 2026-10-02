@@ -124,14 +124,10 @@
         "go.etcd.io/etcd/server/v3",
         "go.etcd.io/raft/v3",
         "go.opentelemetry.io/auto/sdk",
-        "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful",
-        "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp",
-        "go.opentelemetry.io/otel/exporters/otlp/otlptrace",
         "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc",
         "go.uber.org/goleak",
         "go.uber.org/multierr",
         "go.uber.org/zap",
-        "k8s.io/kube-openapi",
         "k8s.io/utils",
         "sigs.k8s.io/kustomize/api",
         "sigs.k8s.io/kustomize/kustomize/v5",
@@ -153,6 +149,9 @@
         "go.etcd.io/etcd/server/v3",
         "google.golang.org/grpc",
         "google.golang.org/protobuf"
+      ],
+      "github.com/google/btree": [
+        "github.com/peterbourgon/diskv/v3"
       ],
       "github.com/google/s2a-go": [
         "google.golang.org/grpc"
@@ -208,14 +207,10 @@
         "go.etcd.io/etcd/server/v3",
         "go.etcd.io/raft/v3",
         "go.opentelemetry.io/auto/sdk",
-        "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful",
-        "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp",
-        "go.opentelemetry.io/otel/exporters/otlp/otlptrace",
         "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc",
         "go.uber.org/goleak",
         "go.uber.org/multierr",
         "go.uber.org/zap",
-        "k8s.io/kube-openapi",
         "sigs.k8s.io/kustomize/api",
         "sigs.k8s.io/kustomize/kustomize/v5",
         "sigs.k8s.io/kustomize/kyaml"
